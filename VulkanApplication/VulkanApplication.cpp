@@ -1,41 +1,22 @@
 #include "VulkanApplication.h"
 
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
-
+#include <string>
 #include <cstdio>
-#include <memory>
+#include <cassert>
 #include <iostream>
+#include <algorithm>
+#include <functional>
 
 /////////////////////////////// private function ///////////////////////////////
 
-void VulkanApplication::init_instance()
+template<typename Collection, typename FunTypeBefore, typename FunType>
+void debug_each(Collection& collection, FunTypeBefore before_func, FunType each_func)
 {
-	const char** glfw_extensions;
-	unsigned int glfw_extensions_count = 0;
-	glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
-
-	VkApplicationInfo app_info = {};
-	VkInstanceCreateInfo create_info = {};
-
-	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	app_info.pNext = NULL;
-	app_info.pApplicationName = "VulkanApplication";
-	app_info.applicationVersion = 1;
-	app_info.pEngineName = "VulkanApplication";
-	app_info.engineVersion = 1;
-	app_info.apiVersion = VK_API_VERSION_1_0;
-
-	create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	create_info.pApplicationInfo = &app_info;
-	create_info.pNext = NULL;
-	create_info.flags = 0;
-	create_info.enabledExtensionCount = glfw_extensions_count;
-	create_info.ppEnabledExtensionNames = glfw_extensions;
-	create_info.enabledLayerCount = 0;
-	create_info.ppEnabledLayerNames = NULL;
-
-	VkResult res = vkCreateInstance(&create_info, NULL, &_vkinstance);
+#ifdef _DEBUG
+	before_func(collection);
+	for (auto& e : collection)
+		each_func(e);
+#endif
 }
 
 void VulkanApplication::init_extensions()
@@ -43,20 +24,165 @@ void VulkanApplication::init_extensions()
 	uint32_t extension_count = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
 	_extensions.resize(extension_count);
-	auto extensions = _extensions.data();
-	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extensions);
-#ifdef _DEBUG
-	std::cout << "available extensions:" << std::endl;
-	for (const auto& extension : _extensions)
+	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, _extensions.data());
+
+	debug_each(_extensions,
+		[](const decltype(_extensions)& extensions) {
+		std::cout << "Available extensions: " << std::endl;
+	},
+		[](const typename decltype(_extensions)::value_type& extension) {
 		std::cout << "\t" << extension.extensionName << std::endl;
-#endif // DEBUG
+	});
+
+	unsigned int glfw_extensions_count = 0;
+	const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
+
+	for (decltype(glfw_extensions_count) i = 0; i < glfw_extensions_count; i++)
+		_extension_names.push_back(glfw_extensions[i]);
+
+	debug_each(_extension_names,
+		[](const decltype(_extension_names)& extension_names) {
+		std::cout << "Required extensions: " << std::endl;
+	},
+		[](const decltype(_extension_names)::value_type& extension_name) {
+		std::cout << extension_name << std::endl;
+	});
 }
 
-void VulkanApplication::setup_debug_callback()
+void VulkanApplication::init_instance()
+{
+	VkApplicationInfo app_info = {};
+	{
+		app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		app_info.pNext = nullptr;
+		app_info.pApplicationName = "VulkanApplication";
+		app_info.applicationVersion = 1;
+		app_info.pEngineName = "VulkanApplication";
+		app_info.engineVersion = 1;
+		app_info.apiVersion = VK_API_VERSION_1_0;
+	}
+
+	VkInstanceCreateInfo create_info = {};
+	{
+		create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		create_info.pApplicationInfo = &app_info;
+		create_info.pNext = nullptr;
+		create_info.flags = 0;
+		create_info.enabledExtensionCount = static_cast<uint32_t>(_extension_names.size());
+		create_info.ppEnabledExtensionNames = _extension_names.data();
+		create_info.enabledLayerCount = 0;
+		create_info.ppEnabledLayerNames = nullptr;
+	}
+
+	VkResult res = vkCreateInstance(&create_info, nullptr, &_vkinstance);
+	assert(res == VK_SUCCESS);
+}
+
+void VulkanApplication::init_surface()
+{
+	VkWin32SurfaceCreateInfoKHR create_Info;
+	{
+		create_Info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		create_Info.hwnd = _hwnd;
+		create_Info.hinstance = _hinstance;
+	}
+
+	VkResult res = vkCreateWin32SurfaceKHR(_vkinstance, &create_Info, nullptr, &_vksurface);
+	assert(res == VK_SUCCESS);
+}
+
+void VulkanApplication::init_physical_device()
+{
+	auto physical_device_score = [](const decltype(_physical_device)& device)
+	{
+		VkPhysicalDeviceFeatures device_features;
+		VkPhysicalDeviceProperties device_properties;
+
+		vkGetPhysicalDeviceFeatures(device, &device_features);
+		vkGetPhysicalDeviceProperties(device, &device_properties);
+
+		int score = device_properties.limits.maxImageDimension2D;
+		if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+			score += 1000;
+		if (device_features.geometryShader)
+			score += 1000;
+		else
+			score = 0;
+		return score;
+	};
+
+	uint32_t device_count = 0;
+	vkEnumeratePhysicalDevices(_vkinstance, &device_count, nullptr);
+	_physical_devices.resize(device_count);
+	vkEnumeratePhysicalDevices(_vkinstance, &device_count, _physical_devices.data());
+
+	int max_device_score = -1;
+	for (auto& device : _physical_devices)
+	{
+		int score = physical_device_score(device);
+		if (score > max_device_score)
+		{
+			max_device_score = score;
+			_physical_device = device;
+		}
+	}
+	assert(_physical_device != VK_NULL_HANDLE);
+
+	debug_each(_physical_devices,
+		[](const decltype(_physical_devices)& devices) {
+		std::cout << "Available physical devices num: " << devices.size() << std::endl;
+	},
+		[](const decltype(_physical_devices)::value_type& device) {});
+}
+
+void  VulkanApplication::init_swapchain_extension()
 {}
 
-void VulkanApplication::pick_physical_device()
-{}
+void VulkanApplication::init_logical_device()
+{
+	VkDeviceQueueCreateInfo queue_info = {};
+	{
+		bool queue_family_found = false;
+		uint32_t queue_family_count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device, &queue_family_count, nullptr);
+		_queue_family_props.resize(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device, &queue_family_count, _queue_family_props.data());
+
+		for (uint32_t i = 0; i < queue_family_count; i++)
+		{
+			auto &queue_family = _queue_family_props[i];
+			if (queue_family.queueCount > 0 && queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				queue_info.queueFamilyIndex = i;
+				queue_family_found = true;
+				break;
+			}
+		}
+		assert(queue_family_found == true);
+
+		float _queue_priorities[1] = { 0.0 };
+		queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_info.pNext = nullptr;
+		queue_info.queueCount = 1;
+		queue_info.pQueuePriorities = _queue_priorities;
+	}
+
+	VkDeviceCreateInfo device_info = {};
+	{
+		device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		device_info.pNext = nullptr;
+		device_info.queueCreateInfoCount = 1;
+		device_info.pQueueCreateInfos = &queue_info;
+		device_info.enabledExtensionCount = 0;
+		device_info.ppEnabledExtensionNames = nullptr;
+		device_info.enabledLayerCount = 0;
+		device_info.ppEnabledLayerNames = nullptr;
+		device_info.pEnabledFeatures = nullptr;
+	}
+
+	VkResult res = vkCreateDevice(_physical_device, &device_info, nullptr, &_vkdevice);
+	assert(res == VK_SUCCESS);
+}
 
 VulkanApplication::ExecutionStatus VulkanApplication::init_window()
 {
@@ -87,6 +213,12 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_window()
 		}
 	}
 
+	// glfw hwnd hinstance
+	{
+		_hwnd = glfwGetWin32Window(_window_ptr.get());
+		_hinstance = GetModuleHandle(nullptr);
+	}
+
 	return STATUS::EXEC_SUCCESS;
 }
 
@@ -95,11 +227,20 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_vulkan()
 	using STATUS = VulkanApplication::ExecutionStatus;
 	if (glfwVulkanSupported() == GLFW_TRUE)
 	{
+		// checking for extension support
+		init_extensions();
+
 		// vkInstance
 		init_instance();
 
-		// Checking for extension support
-		init_extensions();
+		// use WSI
+		init_surface();
+
+		// pick physical device
+		init_physical_device();
+
+		//init logical device
+		init_logical_device();
 
 		return STATUS::EXEC_SUCCESS;
 	}
@@ -140,6 +281,3 @@ void VulkanApplication::run()
 	main_loop();
 	destroy();
 }
-
-VulkanApplication::~VulkanApplication()
-{}

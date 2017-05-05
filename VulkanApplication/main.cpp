@@ -1,5 +1,5 @@
-#include <iostream>
 #include "VulkanApplication.h"
+#include <iostream>
 
 int main()
 {
