@@ -49,8 +49,8 @@ protected:
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
 
 	// vulkan vectors
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> present_modes;
+	std::vector<VkSurfaceFormatKHR> _formats;
+	std::vector<VkPresentModeKHR> _present_modes;
 	std::vector<VkPhysicalDevice> _physical_devices;
 	std::vector<const char*> _instance_extension_names;
 	std::vector<VkExtensionProperties> _instance_extensions;

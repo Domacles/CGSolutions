@@ -150,7 +150,32 @@ void VulkanApplication::init_physical_device()
 }
 
 void  VulkanApplication::init_swapchain_extension()
-{}
+{
+	{
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vkphysical_device, _vksurface,
+			&_vksurface_capabilities);
+	}
+
+	{
+		uint32_t format_count;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device, _vksurface,
+			&format_count, nullptr);
+		_formats.resize(format_count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device, _vksurface,
+			&format_count, _formats.data());
+		assert(format_count != 0);
+	}
+
+	{
+		uint32_t present_mode_count;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device, _vksurface,
+			&present_mode_count, nullptr);
+		_present_modes.resize(present_mode_count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device, _vksurface,
+			&present_mode_count, _present_modes.data());
+		assert(present_mode_count != 0);
+	}
+}
 
 void VulkanApplication::init_logical_device()
 {
