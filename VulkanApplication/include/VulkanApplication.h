@@ -23,7 +23,7 @@ public:
 	// constructor
 	VulkanApplication() :
 		_window_width(800), _window_height(600),
-		_physical_device(VK_NULL_HANDLE)
+		_vkphysical_device(VK_NULL_HANDLE)
 	{};
 	~VulkanApplication() {};
 
@@ -35,19 +35,22 @@ protected:
 	int _window_width;
 	int _window_height;
 
-	// vulkan object
-	VkDevice _vkdevice;
-	VkInstance _vkinstance;
-	VkSurfaceKHR _vksurface;
-	VkCommandPool _vkcommand_pool;
-	VkPhysicalDevice _physical_device;
-
 	// glfw object or pointer
 	HWND _hwnd;
 	HINSTANCE _hinstance;
 	std::shared_ptr<GLFWwindow> _window_ptr;
 
+	// vulkan object
+	VkDevice _vkdevice;
+	VkInstance _vkinstance;
+	VkSurfaceKHR _vksurface;
+	VkCommandPool _vkcommand_pool;
+	VkPhysicalDevice _vkphysical_device;
+	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
+
 	// vulkan vectors
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> present_modes;
 	std::vector<VkPhysicalDevice> _physical_devices;
 	std::vector<const char*> _instance_extension_names;
 	std::vector<VkExtensionProperties> _instance_extensions;

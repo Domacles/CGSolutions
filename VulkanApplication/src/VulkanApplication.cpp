@@ -102,7 +102,7 @@ void VulkanApplication::init_surface()
 
 void VulkanApplication::init_physical_device()
 {
-	auto physical_device_score = [&](const decltype(_physical_device)& device)
+	auto physical_device_score = [&](const decltype(_vkphysical_device)& device)
 	{
 		VkPhysicalDeviceFeatures device_features;
 		VkPhysicalDeviceProperties device_properties;
@@ -133,10 +133,10 @@ void VulkanApplication::init_physical_device()
 			if (score > max_device_score)
 			{
 				max_device_score = score;
-				_physical_device = device;
+				_vkphysical_device = device;
 			}
 		}
-		assert(_physical_device != VK_NULL_HANDLE);
+		assert(_vkphysical_device != VK_NULL_HANDLE);
 
 		debug_each(_physical_devices,
 			[](const decltype(_physical_devices)& devices) {
@@ -158,10 +158,10 @@ void VulkanApplication::init_logical_device()
 	{
 		uint32_t physical_device_extension_count;
 		std::vector<VkExtensionProperties> extensions;
-		vkEnumerateDeviceExtensionProperties(_physical_device, nullptr,
+		vkEnumerateDeviceExtensionProperties(_vkphysical_device, nullptr,
 			&physical_device_extension_count, nullptr);
 		extensions.resize(physical_device_extension_count);
-		vkEnumerateDeviceExtensionProperties(_physical_device, nullptr,
+		vkEnumerateDeviceExtensionProperties(_vkphysical_device, nullptr,
 			&physical_device_extension_count, extensions.data());
 
 		bool is_support_swapchain = false;
@@ -188,10 +188,10 @@ void VulkanApplication::init_logical_device()
 	{
 		bool queue_family_found = false;
 		uint32_t queue_family_count = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device,
+		vkGetPhysicalDeviceQueueFamilyProperties(_vkphysical_device,
 			&queue_family_count, nullptr);
 		_queue_family_props.resize(queue_family_count);
-		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device,
+		vkGetPhysicalDeviceQueueFamilyProperties(_vkphysical_device,
 			&queue_family_count, _queue_family_props.data());
 
 		for (uint32_t i = 0; i < queue_family_count; i++)
@@ -227,7 +227,7 @@ void VulkanApplication::init_logical_device()
 		device_info.pEnabledFeatures = nullptr;
 	}
 
-	VkResult res = vkCreateDevice(_physical_device, &device_info, nullptr, &_vkdevice);
+	VkResult res = vkCreateDevice(_vkphysical_device, &device_info, nullptr, &_vkdevice);
 	assert(res == VK_SUCCESS);
 }
 
