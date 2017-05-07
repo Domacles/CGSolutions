@@ -48,9 +48,10 @@ protected:
 	std::shared_ptr<GLFWwindow> _window_ptr;
 
 	// vulkan vectors
-	std::vector<const char*> _extension_names;
-	std::vector<VkExtensionProperties> _extensions;
 	std::vector<VkPhysicalDevice> _physical_devices;
+	std::vector<const char*> _instance_extension_names;
+	std::vector<VkExtensionProperties> _instance_extensions;
+	std::vector<const char*> _logical_device_extension_names;
 	std::vector<VkQueueFamilyProperties> _queue_family_props;
 
 	// Vulkan

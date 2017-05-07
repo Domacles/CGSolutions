@@ -1,5 +1,6 @@
 #include "VulkanApplication.h"
 
+#include <set>
 #include <string>
 #include <cstdio>
 #include <cassert>
@@ -9,13 +10,14 @@
 
 /////////////////////////////// private function ///////////////////////////////
 
-template<typename Collection, typename FunTypeBefore, typename FunType>
-void debug_each(Collection& collection, FunTypeBefore before_func, FunType each_func)
+template<typename Collection, typename FunTypeBefore, typename FunType, typename FunTypeAfter>
+void debug_each(Collection& collection, FunTypeBefore before_func, FunType each_func, FunTypeAfter after_func)
 {
 #ifdef _DEBUG
 	before_func(collection);
 	for (auto& e : collection)
 		each_func(e);
+	after_func(collection);
 #endif
 }
 
@@ -23,29 +25,36 @@ void VulkanApplication::init_extensions()
 {
 	uint32_t extension_count = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
-	_extensions.resize(extension_count);
-	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, _extensions.data());
+	_instance_extensions.resize(extension_count);
+	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
+		_instance_extensions.data());
 
-	debug_each(_extensions,
-		[](const decltype(_extensions)& extensions) {
-		std::cout << "Available extensions: " << std::endl;
+	debug_each(_instance_extensions,
+		[](const decltype(_instance_extensions)& extensions) {
+		std::cout << "Available instance extensions: " << std::endl;
 	},
-		[](const typename decltype(_extensions)::value_type& extension) {
+		[](const typename decltype(_instance_extensions)::value_type& extension) {
 		std::cout << "\t" << extension.extensionName << std::endl;
+	},
+		[](const decltype(_instance_extensions)& extensions) {
+		std::cout << std::endl;
 	});
 
 	unsigned int glfw_extensions_count = 0;
 	const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
 
 	for (decltype(glfw_extensions_count) i = 0; i < glfw_extensions_count; i++)
-		_extension_names.push_back(glfw_extensions[i]);
+		_instance_extension_names.push_back(glfw_extensions[i]);
 
-	debug_each(_extension_names,
-		[](const decltype(_extension_names)& extension_names) {
-		std::cout << "Required extensions: " << std::endl;
+	debug_each(_instance_extension_names,
+		[](const decltype(_instance_extension_names)& extension_names) {
+		std::cout << "Required instance extensions: " << std::endl;
 	},
-		[](const decltype(_extension_names)::value_type& extension_name) {
-		std::cout << extension_name << std::endl;
+		[](const decltype(_instance_extension_names)::value_type& extension_name) {
+		std::cout << "\t" << extension_name << std::endl;
+	},
+		[](const decltype(_instance_extension_names)& extension_names) {
+		std::cout << std::endl;
 	});
 }
 
@@ -68,8 +77,8 @@ void VulkanApplication::init_instance()
 		create_info.pApplicationInfo = &app_info;
 		create_info.pNext = nullptr;
 		create_info.flags = 0;
-		create_info.enabledExtensionCount = static_cast<uint32_t>(_extension_names.size());
-		create_info.ppEnabledExtensionNames = _extension_names.data();
+		create_info.enabledExtensionCount = static_cast<uint32_t>(_instance_extension_names.size());
+		create_info.ppEnabledExtensionNames = _instance_extension_names.data();
 		create_info.enabledLayerCount = 0;
 		create_info.ppEnabledLayerNames = nullptr;
 	}
@@ -93,7 +102,7 @@ void VulkanApplication::init_surface()
 
 void VulkanApplication::init_physical_device()
 {
-	auto physical_device_score = [](const decltype(_physical_device)& device)
+	auto physical_device_score = [&](const decltype(_physical_device)& device)
 	{
 		VkPhysicalDeviceFeatures device_features;
 		VkPhysicalDeviceProperties device_properties;
@@ -116,23 +125,28 @@ void VulkanApplication::init_physical_device()
 	_physical_devices.resize(device_count);
 	vkEnumeratePhysicalDevices(_vkinstance, &device_count, _physical_devices.data());
 
-	int max_device_score = -1;
-	for (auto& device : _physical_devices)
 	{
-		int score = physical_device_score(device);
-		if (score > max_device_score)
+		int max_device_score = -1;
+		for (auto& device : _physical_devices)
 		{
-			max_device_score = score;
-			_physical_device = device;
+			int score = physical_device_score(device);
+			if (score > max_device_score)
+			{
+				max_device_score = score;
+				_physical_device = device;
+			}
 		}
-	}
-	assert(_physical_device != VK_NULL_HANDLE);
+		assert(_physical_device != VK_NULL_HANDLE);
 
-	debug_each(_physical_devices,
-		[](const decltype(_physical_devices)& devices) {
-		std::cout << "Available physical devices num: " << devices.size() << std::endl;
-	},
-		[](const decltype(_physical_devices)::value_type& device) {});
+		debug_each(_physical_devices,
+			[](const decltype(_physical_devices)& devices) {
+			std::cout << "Available physical devices num: " << devices.size() << std::endl;
+		},
+			[](const decltype(_physical_devices)::value_type& device) {},
+			[](const decltype(_physical_devices)& devices) {
+			std::cout << std::endl;
+		});
+	}
 }
 
 void  VulkanApplication::init_swapchain_extension()
@@ -140,18 +154,51 @@ void  VulkanApplication::init_swapchain_extension()
 
 void VulkanApplication::init_logical_device()
 {
+	_logical_device_extension_names = { "VK_KHR_swapchain" };
+	{
+		uint32_t physical_device_extension_count;
+		std::vector<VkExtensionProperties> extensions;
+		vkEnumerateDeviceExtensionProperties(_physical_device, nullptr,
+			&physical_device_extension_count, nullptr);
+		extensions.resize(physical_device_extension_count);
+		vkEnumerateDeviceExtensionProperties(_physical_device, nullptr,
+			&physical_device_extension_count, extensions.data());
+
+		bool is_support_swapchain = false;
+		std::set<std::string> required_extensions(_logical_device_extension_names.begin(),
+			_logical_device_extension_names.end());
+		for (auto& extension : extensions)
+			required_extensions.erase(extension.extensionName);
+		is_support_swapchain = required_extensions.empty();
+		assert(is_support_swapchain == true);
+
+		debug_each(extensions,
+			[](const decltype(extensions)& extensions) {
+			std::cout << "Available physical device extensions: " << std::endl;
+		},
+			[](const decltype(extensions)::value_type& extension) {
+			std::cout << "\t" << extension.extensionName << std::endl;
+		},
+			[](const decltype(extensions)& extensions) {
+			std::cout << std::endl;
+		});
+	}
+
 	VkDeviceQueueCreateInfo queue_info = {};
 	{
 		bool queue_family_found = false;
 		uint32_t queue_family_count = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device, &queue_family_count, nullptr);
+		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device,
+			&queue_family_count, nullptr);
 		_queue_family_props.resize(queue_family_count);
-		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device, &queue_family_count, _queue_family_props.data());
+		vkGetPhysicalDeviceQueueFamilyProperties(_physical_device,
+			&queue_family_count, _queue_family_props.data());
 
 		for (uint32_t i = 0; i < queue_family_count; i++)
 		{
 			auto &queue_family = _queue_family_props[i];
-			if (queue_family.queueCount > 0 && queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			if (queue_family.queueCount > 0 &&
+				queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				queue_info.queueFamilyIndex = i;
 				queue_family_found = true;
@@ -173,8 +220,8 @@ void VulkanApplication::init_logical_device()
 		device_info.pNext = nullptr;
 		device_info.queueCreateInfoCount = 1;
 		device_info.pQueueCreateInfos = &queue_info;
-		device_info.enabledExtensionCount = 0;
-		device_info.ppEnabledExtensionNames = nullptr;
+		device_info.enabledExtensionCount = static_cast<uint32_t>(_logical_device_extension_names.size());
+		device_info.ppEnabledExtensionNames = _logical_device_extension_names.data();
 		device_info.enabledLayerCount = 0;
 		device_info.ppEnabledLayerNames = nullptr;
 		device_info.pEnabledFeatures = nullptr;
