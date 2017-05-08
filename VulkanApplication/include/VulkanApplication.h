@@ -47,16 +47,19 @@ protected:
 	VkSwapchainKHR _vkswapchain;
 	VkCommandPool _vkcommand_pool;
 	VkPhysicalDevice _vkphysical_device;
+	uint32_t _present_queue_family_index;
+	uint32_t _graphics_queue_family_index;
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
 
 	// vulkan vectors
+	std::vector<VkImage> _swapchain_images;
 	std::vector<VkSurfaceFormatKHR> _formats;
 	std::vector<VkPresentModeKHR> _present_modes;
 	std::vector<VkPhysicalDevice> _physical_devices;
 	std::vector<const char*> _instance_extension_names;
+	std::vector<VkQueueFamilyProperties> _queue_families;
 	std::vector<VkExtensionProperties> _instance_extensions;
 	std::vector<const char*> _logical_device_extension_names;
-	std::vector<VkQueueFamilyProperties> _queue_family_props;
 
 	// Vulkan
 	void init_surface();
