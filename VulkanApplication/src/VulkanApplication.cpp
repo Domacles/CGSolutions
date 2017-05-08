@@ -1,6 +1,11 @@
 #include "VulkanApplication.h"
 
+#undef max
+#undef min
+
 #include <set>
+#include <cmath>
+#include <limits>
 #include <string>
 #include <cstdio>
 #include <cassert>
@@ -151,6 +156,66 @@ void VulkanApplication::init_physical_device()
 
 void  VulkanApplication::init_swapchain_extension()
 {
+	auto choose_swapchain_surface_format = [](const decltype(_formats)& formats)
+		-> VkSurfaceFormatKHR
+	{
+		// format: VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+		// color_space: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+		if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+			return VkSurfaceFormatKHR{
+			VK_FORMAT_B8G8R8A8_UNORM,
+			VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+		};
+
+		for (auto& element : formats)
+		{
+			if (element.format == VK_FORMAT_B8G8R8A8_UNORM &&
+				element.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+				return element;
+		}
+
+		return formats[0];
+	};
+
+	auto choose_swapchain_present_mode = [](const decltype(_present_modes)& present_modes)
+		-> VkPresentModeKHR
+	{
+		// present_mode: VK_PRESENT_MODE_MAILBOX_KHR
+		for (auto& mode : present_modes)
+		{
+			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+				return mode;
+			else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR)
+				return mode;
+		}
+		return VK_PRESENT_MODE_FIFO_KHR;
+	};
+
+	auto choose_swapchain_extent = [&](const decltype(_vksurface_capabilities)& capabilities)
+		->VkExtent2D
+	{
+		if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max())
+		{
+			VkExtent2D now_extent{ _window_width, _window_height };
+			now_extent.width = std::max(capabilities.minImageExtent.width,
+				std::min(capabilities.maxImageExtent.width, now_extent.width));
+			now_extent.height = std::max(capabilities.minImageExtent.height,
+				std::min(capabilities.maxImageExtent.height, now_extent.height));
+			return now_extent;
+		}
+		else
+			return capabilities.currentExtent;
+	};
+
+	auto choose_swapchain_images_count = [](const decltype(_vksurface_capabilities)& capabilities)
+		->uint32_t
+	{
+		uint32_t images_count = capabilities.minImageCount + 1;
+		if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount)
+			images_count = capabilities.maxImageCount;
+		return images_count;
+	};
+
 	{
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vkphysical_device, _vksurface,
 			&_vksurface_capabilities);
@@ -174,6 +239,22 @@ void  VulkanApplication::init_swapchain_extension()
 		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device, _vksurface,
 			&present_mode_count, _present_modes.data());
 		assert(present_mode_count != 0);
+	}
+
+	VkSwapchainCreateInfoKHR create_info = {};
+	{
+		create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		create_info.pNext = NULL;
+		create_info.surface = _vksurface;
+		create_info.minImageCount = choose_swapchain_images_count(_vksurface_capabilities);
+		create_info.imageFormat = choose_swapchain_surface_format(_formats).format;
+		create_info.imageColorSpace = choose_swapchain_surface_format(_formats).colorSpace;
+		create_info.imageExtent = choose_swapchain_extent(_vksurface_capabilities);
+		create_info.imageArrayLayers = 1;
+		create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		VkResult res = vkCreateSwapchainKHR(_vkdevice, &create_info, nullptr, &_vkswapchain);
+		assert(res == VK_SUCCESS);
 	}
 }
 

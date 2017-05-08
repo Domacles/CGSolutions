@@ -44,6 +44,7 @@ protected:
 	VkDevice _vkdevice;
 	VkInstance _vkinstance;
 	VkSurfaceKHR _vksurface;
+	VkSwapchainKHR _vkswapchain;
 	VkCommandPool _vkcommand_pool;
 	VkPhysicalDevice _vkphysical_device;
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
