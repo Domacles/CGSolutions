@@ -457,6 +457,13 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_window()
 	return STATUS::EXEC_SUCCESS;
 }
 
+void VulkanApplication::init_image_views()
+{
+	for (auto& image : _swapchain_images)
+	{
+	}
+}
+
 VulkanApplication::ExecutionStatus VulkanApplication::init_vulkan()
 {
 	using STATUS = VulkanApplication::ExecutionStatus;
@@ -474,8 +481,11 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_vulkan()
 		// pick physical device
 		init_physical_device();
 
-		//init logical device
+		// init logical device
 		init_logical_device();
+
+		// init swapchain and images
+		init_swapchain_extension();
 
 		return STATUS::EXEC_SUCCESS;
 	}
