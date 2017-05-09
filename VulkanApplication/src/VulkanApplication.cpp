@@ -52,8 +52,9 @@ void VulkanApplication::init_extensions()
 	unsigned int glfw_extensions_count = 0;
 	const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
 
+	_instance_extension_names.resize(glfw_extensions_count);
 	for (decltype(glfw_extensions_count) i = 0; i < glfw_extensions_count; i++)
-		_instance_extension_names.push_back(glfw_extensions[i]);
+		_instance_extension_names[i] = glfw_extensions[i];
 
 	debug_each(_instance_extension_names,
 		[](const decltype(_instance_extension_names)& extension_names) {
@@ -151,9 +152,13 @@ void VulkanApplication::init_physical_device()
 		physical_devices.resize(device_count);
 		vkEnumeratePhysicalDevices(_vkinstance_ptr.get(), &device_count,
 			physical_devices.data());
-		for (auto& device : physical_devices)
-			_physical_devices.push_back(std::shared_ptr<VkPhysicalDevice_T>(device,
-				[](const VkPhysicalDevice& device) {}));
+		_physical_devices.resize(device_count);
+		for (size_t i = 0; i < physical_devices.size(); i++)
+		{
+			auto& device = physical_devices[i];
+			_physical_devices[i] = std::shared_ptr<VkPhysicalDevice_T>(device,
+				[](const VkPhysicalDevice& device) {});
+		}
 	}
 
 	{
@@ -204,11 +209,12 @@ void VulkanApplication::init_logical_device()
 		{
 			vkGetPhysicalDeviceQueueFamilyProperties(device_ptr.get(),
 				&queue_family_count, nullptr);
+			present_supports.resize(queue_family_count);
 			for (uint32_t i = 0; i < queue_family_count; i++)
 			{
 				vkGetPhysicalDeviceSurfaceSupportKHR(device_ptr.get(), i,
 					surface_ptr.get(), &support);
-				present_supports.push_back(support);
+				present_supports[i] = support;
 			}
 		}
 
@@ -452,6 +458,9 @@ void  VulkanApplication::init_swapchain_extension()
 			if (swapchain != VK_NULL_HANDLE)
 				vkDestroySwapchainKHR(_vkdevice_ptr.get(), swapchain, nullptr);
 		});
+
+		_swapchain_extent = create_info.imageExtent;
+		_swapchain_image_format = create_info.imageFormat;
 	}
 
 	{
@@ -464,11 +473,51 @@ void  VulkanApplication::init_swapchain_extension()
 			&swapchain_images_count, swapchain_images.data());
 		assert(swapchain_images_count != 0);
 
-		for (auto& image : swapchain_images)
+		_swapchain_images.resize(swapchain_images.size());
+		for (size_t i = 0; i < swapchain_images.size(); i++)
 		{
-			_swapchain_images.push_back(std::shared_ptr<VkImage_T>(image,
-				[](const VkImage& image) {}));
+			auto& image = swapchain_images[i];
+			_swapchain_images[i] = std::shared_ptr<VkImage_T>(image,
+				[](const VkImage& image) {});
 		}
+	}
+}
+
+void VulkanApplication::create_image_views()
+{
+	_image_views.resize(_swapchain_images.size());
+	for (size_t i = 0; i < _swapchain_images.size(); i++)
+	{
+		VkImageView image_view;
+		VkImageViewCreateInfo create_info = {};
+
+		{
+			create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			create_info.image = _swapchain_images[i].get();
+			create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			create_info.format = _swapchain_image_format;
+
+			create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+			create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			create_info.subresourceRange.baseMipLevel = 0;
+			create_info.subresourceRange.levelCount = 1;
+			create_info.subresourceRange.baseArrayLayer = 0;
+			create_info.subresourceRange.layerCount = 1;
+		}
+
+		VkResult res = vkCreateImageView(_vkdevice_ptr.get(), &create_info, nullptr,
+			&image_view);
+		assert(res == VK_SUCCESS);
+
+		_image_views[i] = std::shared_ptr<VkImageView_T>(image_view,
+			[&](const VkImageView& image_view) {
+			if (image_view != VK_NULL_HANDLE)
+				vkDestroyImageView(_vkdevice_ptr.get(), image_view, nullptr);
+		});
 	}
 }
 
@@ -566,6 +615,8 @@ VulkanApplication::ExecutionStatus VulkanApplication::destroy()
 		glfwDestroyWindow(_window_ptr.get());
 	}
 
+	_image_views.clear();
+	_image_views.shrink_to_fit();
 	_vkswapchain_ptr.reset();
 	_vkdevice_ptr.reset();
 	_vksurface_ptr.reset();

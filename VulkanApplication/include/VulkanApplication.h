@@ -40,6 +40,8 @@ protected:
 	std::shared_ptr<GLFWwindow> _window_ptr;
 
 	// vulkan object
+	VkExtent2D _swapchain_extent;
+	VkFormat _swapchain_image_format;
 	uint32_t _present_queue_family_index;
 	uint32_t _graphics_queue_family_index;
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
@@ -73,6 +75,8 @@ protected:
 	void init_logical_device();
 	void init_physical_device();
 	void init_swapchain_extension();
+
+	void create_image_views();
 
 	// main function
 	ExecutionStatus destroy();
