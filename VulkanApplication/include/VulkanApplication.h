@@ -45,6 +45,7 @@ protected:
 	uint32_t _present_queue_family_index;
 	uint32_t _graphics_queue_family_index;
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
+	VkPipelineShaderStageCreateInfo _shader_stages[2];
 
 	// vulkan object pointer
 	std::shared_ptr<VkDevice_T> _vkdevice_ptr;
@@ -52,6 +53,8 @@ protected:
 	std::shared_ptr<VkSurfaceKHR_T> _vksurface_ptr;
 	std::shared_ptr<VkSwapchainKHR_T> _vkswapchain_ptr;
 	std::shared_ptr<VkCommandPool_T> _vkcommand_pool_ptr;
+	std::shared_ptr<VkShaderModule_T> _vert_shader_module_ptr;
+	std::shared_ptr<VkShaderModule_T> _frag_shader_module_ptr;
 	std::shared_ptr<VkPhysicalDevice_T> _vkphysical_device_ptr;
 
 	// vulkan vectors for structs
@@ -61,6 +64,8 @@ protected:
 	std::vector<VkExtensionProperties> _instance_extensions;
 
 	// vulkan vectors for pointers
+	std::vector<char> _vshader_spir_v_bytes;
+	std::vector<char> _fshader_spir_v_bytes;
 	std::vector<const char*> _instance_extension_names;
 	std::vector<const char*> _logical_device_extension_names;
 	std::vector<std::shared_ptr<VkImageView_T>> _image_views;
@@ -77,6 +82,7 @@ protected:
 	void init_swapchain_extension();
 
 	void create_image_views();
+	void create_graphics_pipeline();
 
 	// main function
 	ExecutionStatus destroy();

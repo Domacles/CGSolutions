@@ -9,6 +9,7 @@
 #include <string>
 #include <cstdio>
 #include <cassert>
+#include <fstream>
 #include <iostream>
 #include <algorithm>
 #include <functional>
@@ -521,6 +522,66 @@ void VulkanApplication::create_image_views()
 	}
 }
 
+void VulkanApplication::create_graphics_pipeline()
+{
+	auto read_file = [](const std::string& file_name)
+		->std::vector<char>
+	{
+		std::vector<char> buffer;
+		std::ifstream file(file_name, std::ios::ate | std::ios::binary);
+		if (file.is_open())
+		{
+			size_t file_size = (size_t)file.tellg();
+			buffer.resize(file_size);
+			file.seekg(0);
+			file.read(buffer.data(), file_size);
+			file.close();
+		}
+		else
+			std::cout << "Not has this file." << std::endl;
+		return buffer;
+	};
+
+	auto create_shader_module = [&](const std::vector<char>& code)
+		->std::shared_ptr<VkShaderModule_T>
+	{
+		VkShaderModule shader_module;
+		VkShaderModuleCreateInfo create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		create_info.codeSize = code.size();
+		create_info.pCode = reinterpret_cast<uint32_t*>(
+			const_cast<char*>(code.data()));
+		VkResult res = vkCreateShaderModule(_vkdevice_ptr.get(), &create_info,
+			nullptr, &shader_module);
+		assert(res == VK_SUCCESS);
+		return std::shared_ptr<VkShaderModule_T>(shader_module,
+			[&](const VkShaderModule& shader_module) {
+			if (shader_module != VK_NULL_HANDLE)
+				vkDestroyShaderModule(_vkdevice_ptr.get(), shader_module, nullptr);
+		});
+	};
+
+	_vshader_spir_v_bytes = read_file("vert.spv");
+	_fshader_spir_v_bytes = read_file("frag.spv");
+
+	_vert_shader_module_ptr = create_shader_module(_vshader_spir_v_bytes);
+	_frag_shader_module_ptr = create_shader_module(_fshader_spir_v_bytes);
+
+	VkPipelineShaderStageCreateInfo vert_shader_stage_info = {};
+	vert_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vert_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vert_shader_stage_info.module = _vert_shader_module_ptr.get();
+	vert_shader_stage_info.pName = "main";
+	_shader_stages[0] = vert_shader_stage_info;
+
+	VkPipelineShaderStageCreateInfo frag_shader_stage_info = {};
+	frag_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	frag_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	frag_shader_stage_info.module = _frag_shader_module_ptr.get();
+	frag_shader_stage_info.pName = "main";
+	_shader_stages[1] = frag_shader_stage_info;
+}
+
 VulkanApplication::ExecutionStatus VulkanApplication::init_window()
 {
 	using STATUS = VulkanApplication::ExecutionStatus;
@@ -571,24 +632,14 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_vulkan()
 	using STATUS = VulkanApplication::ExecutionStatus;
 	if (glfwVulkanSupported() == GLFW_TRUE)
 	{
-		// checking for extension support
 		init_extensions();
-
-		// vkInstance
 		init_instance();
-
-		// use WSI
 		init_surface();
-
-		// pick physical device
 		init_physical_device();
-
-		// init logical device
 		init_logical_device();
-
-		// init swapchain and images
 		init_swapchain_extension();
-
+		create_image_views();
+		create_graphics_pipeline();
 		return STATUS::EXEC_SUCCESS;
 	}
 	else
