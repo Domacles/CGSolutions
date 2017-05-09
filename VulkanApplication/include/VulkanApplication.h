@@ -76,7 +76,6 @@ protected:
 	void init_surface();
 	void init_instance();
 	void init_extensions();
-	void init_image_views();
 	void init_logical_device();
 	void init_physical_device();
 	void init_swapchain_extension();

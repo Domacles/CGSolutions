@@ -620,13 +620,6 @@ VulkanApplication::ExecutionStatus VulkanApplication::init_window()
 	return STATUS::EXEC_SUCCESS;
 }
 
-void VulkanApplication::init_image_views()
-{
-	for (auto& image : _swapchain_images)
-	{
-	}
-}
-
 VulkanApplication::ExecutionStatus VulkanApplication::init_vulkan()
 {
 	using STATUS = VulkanApplication::ExecutionStatus;
