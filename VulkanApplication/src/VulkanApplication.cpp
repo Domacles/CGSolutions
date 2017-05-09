@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <functional>
 
-/////////////////////////////// private function ///////////////////////////////
+/////////////////////////////// functions /////////////////////////////////////
 
 template<typename Collection, typename FunTypeBefore, typename FunType, typename FunTypeAfter>
 void debug_each(Collection& collection, FunTypeBefore before_func, FunType each_func, FunTypeAfter after_func)
@@ -26,13 +26,17 @@ void debug_each(Collection& collection, FunTypeBefore before_func, FunType each_
 #endif
 }
 
+/////////////////////////////// private function ///////////////////////////////
+
 void VulkanApplication::init_extensions()
 {
-	uint32_t extension_count = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
-	_instance_extensions.resize(extension_count);
-	vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
-		_instance_extensions.data());
+	{
+		uint32_t extension_count = 0;
+		vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
+		_instance_extensions.resize(extension_count);
+		vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
+			_instance_extensions.data());
+	}
 
 	debug_each(_instance_extensions,
 		[](const decltype(_instance_extensions)& extensions) {
@@ -88,8 +92,15 @@ void VulkanApplication::init_instance()
 		create_info.ppEnabledLayerNames = nullptr;
 	}
 
-	VkResult res = vkCreateInstance(&create_info, nullptr, &_vkinstance);
+	VkInstance instance;
+	VkResult res = vkCreateInstance(&create_info, nullptr, &instance);
 	assert(res == VK_SUCCESS);
+
+	_vkinstance_ptr = std::shared_ptr<VkInstance_T>(instance,
+		[](const VkInstance& instance) {
+		if (instance != VK_NULL_HANDLE)
+			vkDestroyInstance(instance, nullptr);
+	});
 }
 
 void VulkanApplication::init_surface()
@@ -101,19 +112,27 @@ void VulkanApplication::init_surface()
 		create_Info.hinstance = _hinstance;
 	}
 
-	VkResult res = vkCreateWin32SurfaceKHR(_vkinstance, &create_Info, nullptr, &_vksurface);
+	VkSurfaceKHR surface;
+	VkResult res = vkCreateWin32SurfaceKHR(_vkinstance_ptr.get(), &create_Info, nullptr,
+		&surface);
 	assert(res == VK_SUCCESS);
+
+	_vksurface_ptr = std::shared_ptr<VkSurfaceKHR_T>(surface,
+		[&](const VkSurfaceKHR& surface) {
+		if (surface != VK_NULL_HANDLE)
+			vkDestroySurfaceKHR(_vkinstance_ptr.get(), surface, nullptr);
+	});
 }
 
 void VulkanApplication::init_physical_device()
 {
-	auto physical_device_score = [&](const decltype(_vkphysical_device)& device)
+	auto physical_device_score = [&](const decltype(_vkphysical_device_ptr) device_ptr)
 	{
 		VkPhysicalDeviceFeatures device_features;
 		VkPhysicalDeviceProperties device_properties;
 
-		vkGetPhysicalDeviceFeatures(device, &device_features);
-		vkGetPhysicalDeviceProperties(device, &device_properties);
+		vkGetPhysicalDeviceFeatures(device_ptr.get(), &device_features);
+		vkGetPhysicalDeviceProperties(device_ptr.get(), &device_properties);
 
 		int score = device_properties.limits.maxImageDimension2D;
 		if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
@@ -125,23 +144,30 @@ void VulkanApplication::init_physical_device()
 		return score;
 	};
 
-	uint32_t device_count = 0;
-	vkEnumeratePhysicalDevices(_vkinstance, &device_count, nullptr);
-	_physical_devices.resize(device_count);
-	vkEnumeratePhysicalDevices(_vkinstance, &device_count, _physical_devices.data());
+	{
+		uint32_t device_count = 0;
+		std::vector<VkPhysicalDevice> physical_devices;
+		vkEnumeratePhysicalDevices(_vkinstance_ptr.get(), &device_count, nullptr);
+		physical_devices.resize(device_count);
+		vkEnumeratePhysicalDevices(_vkinstance_ptr.get(), &device_count,
+			physical_devices.data());
+		for (auto& device : physical_devices)
+			_physical_devices.push_back(std::shared_ptr<VkPhysicalDevice_T>(device,
+				[](const VkPhysicalDevice& device) {}));
+	}
 
 	{
 		int max_device_score = -1;
-		for (auto& device : _physical_devices)
+		for (auto& device_ptr : _physical_devices)
 		{
-			int score = physical_device_score(device);
+			int score = physical_device_score(device_ptr);
 			if (score > max_device_score)
 			{
 				max_device_score = score;
-				_vkphysical_device = device;
+				_vkphysical_device_ptr = device_ptr;
 			}
 		}
-		assert(_vkphysical_device != VK_NULL_HANDLE);
+		assert(_vkphysical_device_ptr.get() != VK_NULL_HANDLE);
 
 		debug_each(_physical_devices,
 			[](const decltype(_physical_devices)& devices) {
@@ -156,31 +182,32 @@ void VulkanApplication::init_physical_device()
 
 void VulkanApplication::init_logical_device()
 {
-	auto get_queue_families = [](const decltype(_vkphysical_device)& device)
+	auto get_queue_families = [](const decltype(_vkphysical_device_ptr)& device_ptr)
 	{
 		uint32_t queue_family_count = 0;
 		bool queue_family_found = false;
 		std::vector<VkQueueFamilyProperties> queue_families;
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
+		vkGetPhysicalDeviceQueueFamilyProperties(device_ptr.get(), &queue_family_count, nullptr);
 		queue_families.resize(queue_family_count);
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
-		assert(queue_family_found == true);
+		vkGetPhysicalDeviceQueueFamilyProperties(device_ptr.get(), &queue_family_count,
+			queue_families.data());
 		return queue_families;
 	};
 
-	auto find_queue_families_index = [](const decltype(_vkphysical_device)& device,
-		const decltype(_vksurface)& surface, const decltype(_queue_families)& queue_families)
+	auto find_queue_families_index = [](const decltype(_vkphysical_device_ptr)& device_ptr,
+		const decltype(_vksurface_ptr)& surface_ptr, const decltype(_queue_families)& queue_families)
 		->std::pair<uint32_t, uint32_t>
 	{
 		VkBool32 support;
 		uint32_t queue_family_count = 0;
 		std::vector<VkBool32> present_supports;
 		{
-			vkGetPhysicalDeviceQueueFamilyProperties(device,
+			vkGetPhysicalDeviceQueueFamilyProperties(device_ptr.get(),
 				&queue_family_count, nullptr);
 			for (uint32_t i = 0; i < queue_family_count; i++)
 			{
-				vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &support);
+				vkGetPhysicalDeviceSurfaceSupportKHR(device_ptr.get(), i,
+					surface_ptr.get(), &support);
 				present_supports.push_back(support);
 			}
 		}
@@ -210,10 +237,10 @@ void VulkanApplication::init_logical_device()
 	{
 		uint32_t physical_device_extension_count;
 		std::vector<VkExtensionProperties> extensions;
-		vkEnumerateDeviceExtensionProperties(_vkphysical_device, nullptr,
+		vkEnumerateDeviceExtensionProperties(_vkphysical_device_ptr.get(), nullptr,
 			&physical_device_extension_count, nullptr);
 		extensions.resize(physical_device_extension_count);
-		vkEnumerateDeviceExtensionProperties(_vkphysical_device, nullptr,
+		vkEnumerateDeviceExtensionProperties(_vkphysical_device_ptr.get(), nullptr,
 			&physical_device_extension_count, extensions.data());
 
 		bool is_support_swapchain = false;
@@ -239,12 +266,13 @@ void VulkanApplication::init_logical_device()
 	float queue_priorities[1] = { 1.0f };
 	std::vector<VkDeviceQueueCreateInfo> queue_infos;
 	{
+		_queue_families = get_queue_families(_vkphysical_device_ptr);
+
 		auto queue_familiy_indice =
-			find_queue_families_index(_vkphysical_device, _vksurface, _queue_families);
+			find_queue_families_index(_vkphysical_device_ptr, _vksurface_ptr, _queue_families);
 
 		_graphics_queue_family_index = queue_familiy_indice.first;
 		_present_queue_family_index = queue_familiy_indice.second;
-		_queue_families = get_queue_families(_vkphysical_device);
 
 		std::set<uint32_t> unique_queue_families_indice = {
 			_graphics_queue_family_index,
@@ -277,8 +305,18 @@ void VulkanApplication::init_logical_device()
 		device_info.pEnabledFeatures = nullptr;
 	}
 
-	VkResult res = vkCreateDevice(_vkphysical_device, &device_info, nullptr, &_vkdevice);
+	VkDevice device;
+	VkResult res = vkCreateDevice(_vkphysical_device_ptr.get(), &device_info, nullptr, &device);
 	assert(res == VK_SUCCESS);
+
+	_vkdevice_ptr = std::shared_ptr<VkDevice_T>(device,
+		[](const VkDevice& device) {
+		if (device != VK_NULL_HANDLE)
+		{
+			vkDeviceWaitIdle(device);
+			vkDestroyDevice(device, nullptr);
+		}
+	});
 }
 
 void  VulkanApplication::init_swapchain_extension()
@@ -344,27 +382,27 @@ void  VulkanApplication::init_swapchain_extension()
 	};
 
 	{
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vkphysical_device, _vksurface,
-			&_vksurface_capabilities);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vkphysical_device_ptr.get(),
+			_vksurface_ptr.get(), &_vksurface_capabilities);
 	}
 
 	{
 		uint32_t format_count;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device, _vksurface,
-			&format_count, nullptr);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device_ptr.get(),
+			_vksurface_ptr.get(), &format_count, nullptr);
 		_formats.resize(format_count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device, _vksurface,
-			&format_count, _formats.data());
+		vkGetPhysicalDeviceSurfaceFormatsKHR(_vkphysical_device_ptr.get(),
+			_vksurface_ptr.get(), &format_count, _formats.data());
 		assert(format_count != 0);
 	}
 
 	{
 		uint32_t present_mode_count;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device, _vksurface,
-			&present_mode_count, nullptr);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device_ptr.get(),
+			_vksurface_ptr.get(), &present_mode_count, nullptr);
 		_present_modes.resize(present_mode_count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device, _vksurface,
-			&present_mode_count, _present_modes.data());
+		vkGetPhysicalDeviceSurfacePresentModesKHR(_vkphysical_device_ptr.get(),
+			_vksurface_ptr.get(), &present_mode_count, _present_modes.data());
 		assert(present_mode_count != 0);
 	}
 
@@ -376,7 +414,7 @@ void  VulkanApplication::init_swapchain_extension()
 		};
 		create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 		create_info.pNext = NULL;
-		create_info.surface = _vksurface;
+		create_info.surface = _vksurface_ptr.get();
 		create_info.preTransform = _vksurface_capabilities.currentTransform;
 		create_info.presentMode = choose_swapchain_present_mode(_present_modes);
 		create_info.minImageCount = choose_swapchain_images_count(_vksurface_capabilities);
@@ -404,18 +442,33 @@ void  VulkanApplication::init_swapchain_extension()
 			create_info.pQueueFamilyIndices = queue_families_indice.data();
 		}
 
-		VkResult res = vkCreateSwapchainKHR(_vkdevice, &create_info, nullptr, &_vkswapchain);
+		VkSwapchainKHR swapchain;
+		VkResult res = vkCreateSwapchainKHR(_vkdevice_ptr.get(), &create_info,
+			nullptr, &swapchain);
 		assert(res == VK_SUCCESS);
+
+		_vkswapchain_ptr = std::shared_ptr<VkSwapchainKHR_T>(swapchain,
+			[&](const VkSwapchainKHR& swapchain) {
+			if (swapchain != VK_NULL_HANDLE)
+				vkDestroySwapchainKHR(_vkdevice_ptr.get(), swapchain, nullptr);
+		});
 	}
 
 	{
 		uint32_t swapchain_images_count = 0;
-		vkGetSwapchainImagesKHR(_vkdevice, _vkswapchain,
+		std::vector<VkImage> swapchain_images;
+		vkGetSwapchainImagesKHR(_vkdevice_ptr.get(), _vkswapchain_ptr.get(),
 			&swapchain_images_count, NULL);
-		_swapchain_images.resize(swapchain_images_count);
-		vkGetSwapchainImagesKHR(_vkdevice, _vkswapchain,
-			&swapchain_images_count, _swapchain_images.data());
+		swapchain_images.resize(swapchain_images_count);
+		vkGetSwapchainImagesKHR(_vkdevice_ptr.get(), _vkswapchain_ptr.get(),
+			&swapchain_images_count, swapchain_images.data());
 		assert(swapchain_images_count != 0);
+
+		for (auto& image : swapchain_images)
+		{
+			_swapchain_images.push_back(std::shared_ptr<VkImage_T>(image,
+				[](const VkImage& image) {}));
+		}
 	}
 }
 
@@ -511,8 +564,14 @@ VulkanApplication::ExecutionStatus VulkanApplication::destroy()
 
 	{
 		glfwDestroyWindow(_window_ptr.get());
-		_window_ptr.reset();
 	}
+
+	_vkswapchain_ptr.reset();
+	_vkdevice_ptr.reset();
+	_vksurface_ptr.reset();
+	_vkinstance_ptr.reset();
+
+	_window_ptr.reset();
 
 	return STATUS::EXEC_SUCCESS;
 }

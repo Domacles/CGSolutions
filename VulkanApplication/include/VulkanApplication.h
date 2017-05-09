@@ -22,8 +22,7 @@ public:
 
 	// constructor
 	VulkanApplication() :
-		_window_width(800), _window_height(600),
-		_vkphysical_device(VK_NULL_HANDLE)
+		_window_width(800), _window_height(600)
 	{};
 	~VulkanApplication() {};
 
@@ -41,26 +40,30 @@ protected:
 	std::shared_ptr<GLFWwindow> _window_ptr;
 
 	// vulkan object
-	VkDevice _vkdevice;
-	VkInstance _vkinstance;
-	VkSurfaceKHR _vksurface;
-	VkSwapchainKHR _vkswapchain;
-	VkCommandPool _vkcommand_pool;
-	VkPhysicalDevice _vkphysical_device;
 	uint32_t _present_queue_family_index;
 	uint32_t _graphics_queue_family_index;
 	VkSurfaceCapabilitiesKHR _vksurface_capabilities;
 
-	// vulkan vectors
-	std::vector<VkImageView> _image_views;
-	std::vector<VkImage> _swapchain_images;
+	// vulkan object pointer
+	std::shared_ptr<VkDevice_T> _vkdevice_ptr;
+	std::shared_ptr<VkInstance_T> _vkinstance_ptr;
+	std::shared_ptr<VkSurfaceKHR_T> _vksurface_ptr;
+	std::shared_ptr<VkSwapchainKHR_T> _vkswapchain_ptr;
+	std::shared_ptr<VkCommandPool_T> _vkcommand_pool_ptr;
+	std::shared_ptr<VkPhysicalDevice_T> _vkphysical_device_ptr;
+
+	// vulkan vectors for structs
 	std::vector<VkSurfaceFormatKHR> _formats;
 	std::vector<VkPresentModeKHR> _present_modes;
-	std::vector<VkPhysicalDevice> _physical_devices;
-	std::vector<const char*> _instance_extension_names;
 	std::vector<VkQueueFamilyProperties> _queue_families;
 	std::vector<VkExtensionProperties> _instance_extensions;
+
+	// vulkan vectors for pointers
+	std::vector<const char*> _instance_extension_names;
 	std::vector<const char*> _logical_device_extension_names;
+	std::vector<std::shared_ptr<VkImageView_T>> _image_views;
+	std::vector<std::shared_ptr<VkImage_T>> _swapchain_images;
+	std::vector<std::shared_ptr<VkPhysicalDevice_T>> _physical_devices;
 
 	// Vulkan
 	void init_surface();
