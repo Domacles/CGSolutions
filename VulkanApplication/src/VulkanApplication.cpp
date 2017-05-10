@@ -491,7 +491,6 @@ void VulkanApplication::create_image_views()
 	{
 		VkImageView image_view;
 		VkImageViewCreateInfo create_info = {};
-
 		{
 			create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			create_info.image = _swapchain_images[i].get();
@@ -568,18 +567,107 @@ void VulkanApplication::create_graphics_pipeline()
 	_frag_shader_module_ptr = create_shader_module(_fshader_spir_v_bytes);
 
 	VkPipelineShaderStageCreateInfo vert_shader_stage_info = {};
-	vert_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vert_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vert_shader_stage_info.module = _vert_shader_module_ptr.get();
-	vert_shader_stage_info.pName = "main";
+	{
+		vert_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vert_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vert_shader_stage_info.module = _vert_shader_module_ptr.get();
+		vert_shader_stage_info.pName = "main";
+	}
 	_shader_stages[0] = vert_shader_stage_info;
 
 	VkPipelineShaderStageCreateInfo frag_shader_stage_info = {};
-	frag_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	frag_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	frag_shader_stage_info.module = _frag_shader_module_ptr.get();
-	frag_shader_stage_info.pName = "main";
+	{
+		frag_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		frag_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		frag_shader_stage_info.module = _frag_shader_module_ptr.get();
+		frag_shader_stage_info.pName = "main";
+	}
 	_shader_stages[1] = frag_shader_stage_info;
+
+	// vertex input state
+	VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+	{
+		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertex_input_info.vertexBindingDescriptionCount = 0;
+		vertex_input_info.pVertexBindingDescriptions = nullptr; // Optional
+		vertex_input_info.vertexAttributeDescriptionCount = 0;
+		vertex_input_info.pVertexAttributeDescriptions = nullptr; // Optional
+	}
+
+	// input assembly
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {};
+	{
+		input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		input_assembly_info.primitiveRestartEnable = VK_FALSE;
+	}
+
+	// viewport and scissors
+	VkPipelineViewportStateCreateInfo viewport_state_info = {};
+	{
+		VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = static_cast<float>(_swapchain_extent.width);
+		viewport.height = static_cast<float>(_swapchain_extent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		VkRect2D scissor = {};
+		scissor.offset = { 0, 0 };
+		scissor.extent = _swapchain_extent;
+
+		viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewport_state_info.viewportCount = 1;
+		viewport_state_info.pViewports = &viewport;
+		viewport_state_info.scissorCount = 1;
+		viewport_state_info.pScissors = &scissor;
+	}
+
+	// rasterizer
+	VkPipelineRasterizationStateCreateInfo rasterizer_info = {};
+	{
+		rasterizer_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rasterizer_info.depthClampEnable = VK_FALSE;
+		rasterizer_info.rasterizerDiscardEnable = VK_FALSE;
+		rasterizer_info.polygonMode = VK_POLYGON_MODE_FILL;
+		rasterizer_info.lineWidth = 1.0f;
+		rasterizer_info.cullMode = VK_CULL_MODE_BACK_BIT;
+		rasterizer_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		rasterizer_info.depthBiasEnable = VK_FALSE;
+	}
+
+	// multisampling
+	VkPipelineMultisampleStateCreateInfo multisampling_info = {};
+	{
+		multisampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisampling_info.sampleShadingEnable = VK_FALSE;
+		multisampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	}
+
+	// depth stencil
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {};
+	{}
+
+	// color blend
+	VkPipelineColorBlendStateCreateInfo color_blending_info = {};
+	{
+		VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+			VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		color_blend_attachment.blendEnable = VK_FALSE;
+
+		color_blending_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		color_blending_info.logicOpEnable = VK_FALSE;
+		color_blending_info.logicOp = VK_LOGIC_OP_COPY;
+		color_blending_info.attachmentCount = 1;
+		color_blending_info.pAttachments = &color_blend_attachment;
+		color_blending_info.blendConstants[0] = 0.0f;
+		color_blending_info.blendConstants[1] = 0.0f;
+		color_blending_info.blendConstants[2] = 0.0f;
+		color_blending_info.blendConstants[3] = 0.0f;
+	}
+	// todo
 }
 
 VulkanApplication::ExecutionStatus VulkanApplication::init_window()
