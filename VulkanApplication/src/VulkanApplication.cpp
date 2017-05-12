@@ -99,7 +99,7 @@ void VulkanApplication::init_instance()
 	assert(res == VK_SUCCESS);
 
 	_vkinstance_ptr = std::shared_ptr<VkInstance_T>(instance,
-		[](const VkInstance& instance) {
+		[](VkInstance instance) {
 		if (instance != VK_NULL_HANDLE)
 			vkDestroyInstance(instance, nullptr);
 	});
@@ -120,7 +120,7 @@ void VulkanApplication::init_surface()
 	assert(res == VK_SUCCESS);
 
 	_vksurface_ptr = std::shared_ptr<VkSurfaceKHR_T>(surface,
-		[&](const VkSurfaceKHR& surface) {
+		[&](VkSurfaceKHR surface) {
 		if (surface != VK_NULL_HANDLE)
 			vkDestroySurfaceKHR(_vkinstance_ptr.get(), surface, nullptr);
 	});
@@ -158,7 +158,7 @@ void VulkanApplication::init_physical_device()
 		{
 			auto& device = physical_devices[i];
 			_physical_devices[i] = std::shared_ptr<VkPhysicalDevice_T>(device,
-				[](const VkPhysicalDevice& device) {});
+				[](VkPhysicalDevice device) {});
 		}
 	}
 
@@ -317,7 +317,7 @@ void VulkanApplication::init_logical_device()
 	assert(res == VK_SUCCESS);
 
 	_vkdevice_ptr = std::shared_ptr<VkDevice_T>(device,
-		[](const VkDevice& device) {
+		[](VkDevice device) {
 		if (device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(device);
@@ -455,7 +455,7 @@ void  VulkanApplication::init_swapchain_extension()
 		assert(res == VK_SUCCESS);
 
 		_vkswapchain_ptr = std::shared_ptr<VkSwapchainKHR_T>(swapchain,
-			[&](const VkSwapchainKHR& swapchain) {
+			[&](VkSwapchainKHR swapchain) {
 			if (swapchain != VK_NULL_HANDLE)
 				vkDestroySwapchainKHR(_vkdevice_ptr.get(), swapchain, nullptr);
 		});
@@ -479,7 +479,7 @@ void  VulkanApplication::init_swapchain_extension()
 		{
 			auto& image = swapchain_images[i];
 			_swapchain_images[i] = std::shared_ptr<VkImage_T>(image,
-				[](const VkImage& image) {});
+				[](VkImage image) {});
 		}
 	}
 }
@@ -514,7 +514,7 @@ void VulkanApplication::create_image_views()
 		assert(res == VK_SUCCESS);
 
 		_image_views[i] = std::shared_ptr<VkImageView_T>(image_view,
-			[&](const VkImageView& image_view) {
+			[&](VkImageView image_view) {
 			if (image_view != VK_NULL_HANDLE)
 				vkDestroyImageView(_vkdevice_ptr.get(), image_view, nullptr);
 		});
@@ -538,6 +538,7 @@ void VulkanApplication::create_graphics_pipeline()
 		}
 		else
 			std::cout << "Not has this file." << std::endl;
+		assert(buffer.size());
 		return buffer;
 	};
 
@@ -554,7 +555,7 @@ void VulkanApplication::create_graphics_pipeline()
 			nullptr, &shader_module);
 		assert(res == VK_SUCCESS);
 		return std::shared_ptr<VkShaderModule_T>(shader_module,
-			[&](const VkShaderModule& shader_module) {
+			[&](VkShaderModule shader_module) {
 			if (shader_module != VK_NULL_HANDLE)
 				vkDestroyShaderModule(_vkdevice_ptr.get(), shader_module, nullptr);
 		});
