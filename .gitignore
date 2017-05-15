@@ -1,2 +1,4 @@
 BezierMesh/node_modules/**/**/**
 **/build/**
+*.suo
+octree_code/UpgradeLog.htm
