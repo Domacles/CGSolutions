@@ -176,6 +176,4 @@ private:
 	int size_;
 };
 
-#include "octree.hpp"
-
 #endif
