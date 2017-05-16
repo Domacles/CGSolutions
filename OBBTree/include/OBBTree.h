@@ -29,6 +29,24 @@ public:
 	OBB(const PointType& axis_x, const PointType& axis_y, const PointType& axis_z,
 		const PointType& minp, const PointType& maxp) noexcept;
 
+	// TODO: need static class function for intersecting between obb1 and obb2
+
+	inline Normal axis_x() const;
+
+	inline Normal axis_y() const;
+
+	inline Normal axis_z() const;
+
+	inline PointType minp() const;
+
+	inline PointType maxp() const;
+
+	inline PointType center() const;
+
+	inline PointType extent() const;
+
+	// TODO: need member function for intersecting between this and obb
+
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
