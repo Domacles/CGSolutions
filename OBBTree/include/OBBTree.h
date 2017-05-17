@@ -8,7 +8,7 @@
 
 NAMESPACE_BEGAIN(CollisionAlgorithm)
 
-using Normal = Eigen::Vector3d;
+using NormalType = Eigen::Vector3d;
 
 using PointType = Eigen::Vector3d;
 
@@ -31,11 +31,11 @@ public:
 
 	// TODO: need static class function for intersecting between obb1 and obb2
 
-	inline Normal axis_x() const;
+	inline NormalType axis_x() const;
 
-	inline Normal axis_y() const;
+	inline NormalType axis_y() const;
 
-	inline Normal axis_z() const;
+	inline NormalType axis_z() const;
 
 	inline PointType minp() const;
 
@@ -50,7 +50,7 @@ public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
-	Normal _axis_x, _axis_y, _axis_z;
+	NormalType _axis_x, _axis_y, _axis_z;
 	PointType _minp, _maxp;
 };
 
