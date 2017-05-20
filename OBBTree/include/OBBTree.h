@@ -3,14 +3,18 @@
 
 #include <Eigen/Dense>
 
+#ifndef NAMESPACE_BEGAIN
+
 #define NAMESPACE_BEGAIN(name) namespace name {
 #define NAMESPACE_END(name) }
 
+#endif // !NAMESPACE_BEGAIN
+
 NAMESPACE_BEGAIN(CollisionAlgorithm)
 
-using NormalType = Eigen::Vector3d;
-
 using PointType = Eigen::Vector3d;
+
+using NormalType = Eigen::Vector3d;
 
 class OBB
 {
@@ -22,36 +26,24 @@ public:
 
 	OBB& operator=(const OBB& obb) = default;
 
-	OBB(const OBB&& obb) noexcept;
-
-	OBB& operator=(const OBB&& obb);
-
 	OBB(const PointType& axis_x, const PointType& axis_y, const PointType& axis_z,
-		const PointType& minp, const PointType& maxp) noexcept;
+		const PointType& center, const PointType& extent) noexcept;
 
-	// TODO: need static class function for intersecting between obb1 and obb2
+	inline PointType center() const { return _center; }
 
-	inline NormalType axis_x() const;
+	inline PointType extent() const { return _extent; }
 
-	inline NormalType axis_y() const;
+	inline PointType axis_x() const { return _axis_x; }
 
-	inline NormalType axis_z() const;
+	inline PointType axis_y() const { return _axis_y; }
 
-	inline PointType minp() const;
-
-	inline PointType maxp() const;
-
-	inline PointType center() const;
-
-	inline PointType extent() const;
-
-	// TODO: need member function for intersecting between this and obb
+	inline PointType axis_z() const { return _axis_z; }
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
+	PointType _center, _extent;
 	NormalType _axis_x, _axis_y, _axis_z;
-	PointType _minp, _maxp;
 };
 
 NAMESPACE_END(CollisionAlgorithm)
