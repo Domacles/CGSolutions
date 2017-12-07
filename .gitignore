@@ -3,3 +3,4 @@ BezierMesh/node_modules/**/**/**
 *.suo
 octree_code/UpgradeLog.htm
 **/Debug
+*.db
